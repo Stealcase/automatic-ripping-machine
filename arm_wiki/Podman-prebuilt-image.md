@@ -8,8 +8,8 @@ This is how you should think of ARM from a security standpoint with podman. The 
 
 |                                 | Rootful Host (insecure)         | Rootless Host (more secure)|
 | ------------------------------- | -----------------------------   | -------------------------- |
-| Root Container (insecure)       | ARM during container setup      |                            |
-| Rootless Container (more secure)| ARM when running as `arm` user  |                            |
+| Root in Container (insecure)    | ARM during container setup      |            ✖️              |
+| Rootless Container (more secure)| ARM when running as `arm` user  |            ✖️              |
 
 - ARM expects the host to have a user called `arm` on the host machine (the name does not matter! as long as you pass in the correct PID and GID, which is typically 1000 for the first user on the system)
 - It expects the the mounted volumes like `media`, `logs`, `music`, `config` to be owned by this `arm` user.
