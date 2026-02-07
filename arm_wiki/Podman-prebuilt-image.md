@@ -22,7 +22,7 @@ This is how you should think of ARM from a security standpoint with podman. The 
 ### Minimum podman 
 ```
 # This assumes your cdrom is sr0
-podman run \
+sudo podman run \
     -p "8080:8080" \
     -e ARM_UID="1000" \
     -e ARM_GID="1000" \
@@ -47,8 +47,9 @@ This assumes a file structure like so:
       - media/
       - logs/
 ```
-This aligns with podman's tendency to prefer to keep config inside the calling user's directories, rather than polluting and chaning ownership in the hosts `/etc` directory
-[Other ARM documentation](https://github.com/automatic-ripping-machine/automatic-ripping-machine/wiki/docker) recommends that you need to run the `lsscsi -g` and grab the corresponding sg* device for your sr* device and pass that in as well, but I have had no trouble running with only ´sr0´ device passed in. Your mileage may vary.
+This aligns with podman's tendency to prefer to keep config inside the calling user's directories, rather than polluting and chaning ownership in the hosts `/etc` directory.
+
+[Other ARM documentation](docker) recommends that you need to run the `lsscsi -g` and grab the corresponding sg* device for your sr* device and pass that in as well, but I have had no trouble running with only ´sr0´ device passed in. Your mileage may vary.
 
 
 ### Gotchas
