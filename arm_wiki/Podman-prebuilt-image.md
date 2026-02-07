@@ -1,11 +1,10 @@
-# Fedora + Podman
+Everything described in [the docker instructions](docker) is relevant, but this page is dedicated to podman quirks.
+# Podman
 Your first instinct when using Podman should be to run containers as rootless.
-A typical container designed to work with rootless podman would run as root inside the container, and inherit any non-root permissions of the host machines user calling the pod. In the BEST-case scenario, the user inside the container would also be rootless, 
-Unfortunately this is not how ARM works, since it has been designed with Docker in mind, which has insecure root b
-this doesn't work with ARM, as it has been designed from the ground up to be run as root (default behaviour in Docker) and uses those permissions to do mounting of cdrom, but then does the actual runtime behaviour as the "arm" user, which it expects to exist on the host machine.
+A typical container designed to work with rootless podman would run as root or a user inside the container, and inherit any non-root permissions of the host user running the pod. In the BEST-case scenario, the user inside the container would also be rootless, with means the host user is rootless and the container is rootless.
+**Unfortunately this is not how ARM works, since it has been designed with Docker in mind, which runs as insecure root by default**, but efforts have been made to not run the scripts as root inside the container.
 ### podman root mode
-
-This is how you should think of ARM from a security standpoint and podman. The classic Podman matrix where the bottom-right side is the most secure, and the upper left side is the least. **This doesn't really matter if youre just running this locally without network access**, but it gives you a good idea of the expectations of the container image.
+This is how you should think of ARM from a security standpoint with podman. The classic Podman matrix where the bottom-right side is the most secure, and the upper left side is the least. **This doesn't really matter if youre just running this locally without network access**, but it gives you an idea of the expectations of permissions needed in the container image.
 
 |                                 | Rootful Host (insecure)         | Rootless Host (more secure)|
 | ------------------------------- | -----------------------------   | -------------------------- |
@@ -27,7 +26,7 @@ podman run \
     -p "8080:8080" \
     -e ARM_UID="1000" \
     -e ARM_GID="1000" \
-    -v /home/arm/:/home/arm:Z \
+    -v /home/arm/content:/home/arm:Z \
     -v /home/arm/.config:/etc/arm/config:Z \
     --device /dev/sr0 \
     --restart always \
@@ -42,10 +41,13 @@ This assumes a file structure like so:
 ```
 - /home/
   - arm/
-    - music/
-    - media/
-    - logs/
+    - .config/
+    - content/
+      - music/
+      - media/
+      - logs/
 ```
+This aligns with podman's tendency to prefer to keep config inside the calling user's directories, rather than polluting and chaning ownership in the hosts `/etc` directory
 [Other ARM documentation](https://github.com/automatic-ripping-machine/automatic-ripping-machine/wiki/docker) recommends that you need to run the `lsscsi -g` and grab the corresponding sg* device for your sr* device and pass that in as well, but I have had no trouble running with only ´sr0´ device passed in. Your mileage may vary.
 
 
