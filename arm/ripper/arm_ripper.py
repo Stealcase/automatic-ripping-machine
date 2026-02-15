@@ -17,36 +17,17 @@ from arm.ui import app, db, constants  # noqa E402
 from arm.models.job import JobState  # noqa E402
 
 
-def rip_visual_media(have_dupes, job, logfile, protection):
+def rip_visual_media(job, logfile, protection):
     """
     Main ripping function for dvd and Blu-rays, movies or series
     \n
-    :param have_dupes: Does this disc already exist in the database
     :param job: Current job
     :param logfile: Current logfile
     :param protection: Does the disc have 99 track protection
     :return: None
     """
     # Fix the sub-folder type - (movie|tv|unknown)
-    type_sub_folder = utils.convert_job_type(job.video_type)
-    # Fix the job title - Title (Year) | Title
-    job_title = utils.fix_job_title(job)
 
-    # We need to check/construct the final path, and the transcode path
-    transcode_out_path = os.path.join(job.config.TRANSCODE_PATH, type_sub_folder, job_title)
-    final_directory = os.path.join(job.config.COMPLETED_PATH, type_sub_folder, job_title)
-
-    # Check folders for already ripped jobs -> creates folder
-    transcode_out_path = utils.check_for_dupe_folder(have_dupes, transcode_out_path, job)
-    # If dupes rips is disabled this might kill the run
-    final_directory = utils.check_for_dupe_folder(have_dupes, final_directory, job)
-
-    # Update the job.path with the final directory
-    utils.database_updater({'path': final_directory}, job)
-    # Save poster image from disc if enabled
-    utils.save_disc_poster(final_directory, job)
-
-    logging.info(f"Processing files to: {transcode_out_path}")
     makemkv_out_path = None
     transcode_in_path = str(job.devpath)
     # Do we need to use MakeMKV - Blu-rays, protected dvd's, and dvd with mainfeature off
@@ -67,6 +48,18 @@ def rip_visual_media(have_dupes, job, logfile, protection):
         logging.info("************* Ripping with MakeMKV completed *************")
         # point HB/FFMPEG to the path MakeMKV ripped to
         transcode_in_path = makemkv_out_path
+    
+    # Save poster image from disc if enabled
+    utils.save_disc_poster(transcode_in_path, job)
+    
+    type_sub_folder = utils.convert_job_type(job.video_type)
+    # Fix the job title - Title (Year) | Title
+    job_title = utils.fix_job_title(job)
+
+    # We need to check/construct the final path, and the transcode path
+    transcode_out_path = os.path.join(job.config.TRANSCODE_PATH, type_sub_folder, job_title)
+    transcode_out_path = utils.create_unique_dir(transcode_out_path, job)
+    logging.info(f"Processing files to: {transcode_out_path}")
     # Begin transcoding section - only transcode if skip_transcode is false
     start_transcode(job, logfile, transcode_in_path, transcode_out_path, protection)
 
@@ -77,6 +70,13 @@ def rip_visual_media(have_dupes, job, logfile, protection):
         utils.delete_raw_files([transcode_out_path])
         transcode_out_path = transcode_in_path
 
+
+
+    # Check folders for already ripped jobs -> creates folder
+    final_directory = os.path.join(job.config.COMPLETED_PATH, type_sub_folder, job_title)
+    final_directory = utils.create_unique_dir(final_directory, job)
+    # Update the job.path with the final directory
+    utils.database_updater({'path': final_directory}, job)
     # Update final path if user has set a custom/manual title
     logging.debug(f"Job title status: [{job.title_manual}]")
     if job.title_manual:

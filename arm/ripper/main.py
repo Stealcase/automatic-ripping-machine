@@ -108,11 +108,20 @@ def main():
     logging.info("Starting Disc identification")
     identify.identify(job)
 
-    # Check db for entries matching the crc and successful
-    have_dupes = utils.job_dupe_check(job)
-    logging.debug(f"Value of have_dupes: {have_dupes}")
-
+    # --- Duplicate Check -----
+    # Check db for any ongoing jobs that match the Label
+    # We want to exit as early as possible if the user does
+    # not allow Dupes
+    dupes = utils.get_all_dupe_jobs(job)
+    if dupes != None and len(dupes) > 0:
+        logging.debug(f"{len(dupes)} dupes found")
+        for dupe in dupes:
+            logging.debug(f"{dupe}")
+        if utils.check_if_dupe_should_exit_early(job):
+            logging.info
+            raise utils.RipperException(f"Job killed due to Duplicate check")
     utils.notify_entry(job)
+
     # Check if user has manual wait time enabled
     utils.check_for_wait(job)
 
@@ -122,7 +131,7 @@ def main():
     # Ripper type assessment for the various media types
     # Type: dvd/bluray
     if job.disctype in ["dvd", "bluray"]:
-        arm_ripper.rip_visual_media(have_dupes, job, log_file, job.has_track_99)
+        arm_ripper.rip_visual_media(job, logfile, job.has_track_99)
 
     # Type: Music
     elif job.disctype == "music":
