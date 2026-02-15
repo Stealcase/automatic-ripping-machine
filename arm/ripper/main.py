@@ -118,7 +118,6 @@ def main():
         for dupe in dupes:
             logging.debug(f"{dupe}")
         if utils.check_if_dupe_should_exit_early(job):
-            logging.info
             raise utils.RipperException(f"Job killed due to Duplicate check")
     utils.notify_entry(job)
 
