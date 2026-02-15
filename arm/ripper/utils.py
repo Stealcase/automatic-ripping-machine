@@ -828,51 +828,32 @@ def check_for_dupe_folder(have_dupes, hb_out_path, job):
     return hb_out_path
 
 
-def job_dupe_check(job):
+def get_all_dupe_jobs(job) -> list[dict[str,str]] | None:
     """
-    function for checking the database to look for jobs that have completed
-    successfully with the same label
+    function for checking the database to look for jobs that
+    have not failed with the same label.
+    This means currently running jobs might be grabbed
     :param job: The job obj, so we can use the crc/title etc.
-    :return: True/False, dict/None
+    :return: dict/None
     """
     logging.debug(f"Trying to find jobs with matching Label={job.label}")
     if job.label is None:
         logging.info("Disc title 'None' not searched in database")
-        return False
+        return None
     else:
-        previous_rips = Job.query.filter_by(label=job.label, status=JobState.SUCCESS.value)
-        results = {}
+        # We don't count failures when doing Dupe Checks, 
+        # but anything else thats currently in progress can be a Dupe
+        matching_jobs = Job.query.filter(Job.label==job.label, Job.status != JobState.FAILURE.value, Job.job_id != job.job_id).all()
+        results = []
         i = 0
-        for j in previous_rips:
+        for j in matching_jobs:
             # logging.debug(f"job obj= {j.get_d()}")
-            job_dict = j.get_d().items()
+            job_dict = j
             results[i] = {}
             for key, value in iter(job_dict):
                 results[i][str(key)] = str(value)
             i += 1
-
-    # logging.debug(f"previous rips = {results}")
-    if results:
-        logging.debug(f"we have {len(results)} jobs")
-        # Check if results too large (over 1), skip if too many
-        if len(results) == 1:
-            # This might need some tweaks to because of title/year manual
-            title = results[0]['title'] if results[0]['title'] else job.label
-            year = results[0]['year'] if results[0]['year'] != "" else ""
-            poster_url = results[0]['poster_url'] if results[0]['poster_url'] != "" else None
-            hasnicetitle = (str(results[0]['hasnicetitle']).lower() == 'true')
-            video_type = results[0]['video_type'] if results[0]['hasnicetitle'] != "" else "unknown"
-            active_rip = {
-                "title": title, "year": year, "poster_url": poster_url, "hasnicetitle": hasnicetitle,
-                "video_type": video_type}
-            database_updater(active_rip, job)
-            return True
-        else:
-            logging.debug(f"Skipping - There are too many results [{len(results)}]")
-            return False
-    else:
-        logging.info("We have no previous rips/jobs matching this label")
-        return False
+        return results
 
 
 def check_for_wait(job):
