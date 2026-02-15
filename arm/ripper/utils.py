@@ -798,8 +798,90 @@ def save_disc_poster(final_directory, job):
             os.system(f'ffmpeg -i "{job.mountpoint}/JACKET_P/J00___6L.MP2" "{final_directory}/poster.png"')
         os.system(f"umount {job.devpath}")
 
+def generate_safe_output_dir_name(have_dupes, hb_out_path, job) -> str:
+    """
+    Check if the folder already exists.
+    If it already exists we make and return a new
+    path that has not been made yet.
+    DOES NOT CREATE A DIRECTORY.
+    :param have_dupes: Does this disc already exist in the database
+    :param hb_out_path: path to HandBrake out
+    :param job: Current job
+    :return: Final media directory path
+    """
 
-def check_for_dupe_folder(have_dupes, hb_out_path, job):
+    if os.path.exists(hb_out_path):
+        logging.info(f"Output directory \"{hb_out_path}\" already exists.")
+        logging.debug(f"Value of ALLOW_DUPLICATES: {cfg.arm_config['ALLOW_DUPLICATES']}")
+        logging.debug(f"Value of have_dupes: {have_dupes}")
+        if cfg.arm_config["ALLOW_DUPLICATES"] or not have_dupes:
+            #job.stage is used as a makeshift random number generator
+            hb_out_path = hb_out_path + "_" + job.stage
+            logging.debug(f"Attempting to generate a new path: {hb_out_path}")
+            if os.path.exists(hb_out_path):
+                # This should never happen, but if someone is mucking around
+                # in their directories it might
+                logging.exception(
+                    "A fatal error has occurred and ARM is exiting.  "
+                        f"Randomly generated directory suffix is not unique: {hb_out_path}")
+                notify(job, NOTIFY_TITLE,
+                       f"ARM encountered a fatal error processing {job.title}."
+                       f" Randomly generated path suffix hit a duplicate collision: {hb_out_path} ")
+                database_updater({'status': JobState.FAILURE.value, 'errors': 'Generating unique path failed'}, job)
+                sys.exit()
+        else:
+            logging.exception(
+                "A fatal error has occurred and ARM is exiting.  "
+                    f"Value of ALLOW_DUPLICATES: {cfg.arm_config['ALLOW_DUPLICATES']}")
+            notify(job, NOTIFY_TITLE,
+                   f"ARM encountered a fatal error processing {job.title}."
+                    f"Value of ALLOW_DUPLICATES: {cfg.arm_config['ALLOW_DUPLICATES']}")
+            database_updater({'status': JobState.FAILURE.value, 'errors': 'Stopping duplicate job'}, job)
+            sys.exit()
+        return hb_out_path
+    else:
+        return hb_out_path
+
+def check_if_dupe_should_exit_early(job : Job) -> bool:
+    """
+    The job has duplicate entries. This checks whether the system should exit early.
+    :return: True if the media is a dupe and you should exit early. False if you can keep going
+    """
+    if cfg.arm_config["ALLOW_DUPLICATES"] == False:
+        logging.exception(
+            "A fatal error has occurred and ARM is exiting.  "
+                f" Duplicate job exists and config 'ALLOW_DUPLICATES' is set to: {cfg.arm_config['ALLOW_DUPLICATES']}")
+        notify(job, NOTIFY_TITLE,
+               f"ARM encountered a fatal error processing {job.title}."
+                f" Duplicate job exists: and config 'ALLOW_DUPLICATES' is set to: {cfg.arm_config['ALLOW_DUPLICATES']}")
+        # Its very important that we set "Failure" here as a job state, since future duplicate checks
+        # Rely on filtering this
+        database_updater({'status': JobState.FAILURE.value, 'errors': 'Duplicate job already exists'}, job)
+        return True
+    return False
+
+
+def create_unique_dir(hb_out_path, job):
+    if (make_dir(hb_out_path)) is False:
+        # job.stage is used as a makeshift random number generator.
+        # This should only be replaced if its not fit for the task
+        hb_out_path = hb_out_path + "_" + job.stage
+        logging.debug(f"Attempting to generate a new path: {hb_out_path}")
+        if os.path.exists(hb_out_path):
+            # This should never happen, but if someone is mucking around
+            # in their directories it might
+            logging.exception(
+                "A fatal error has occurred and ARM is exiting.  "
+                    f"Randomly generated directory suffix is not unique: {hb_out_path}")
+            notify(job, NOTIFY_TITLE,
+                   f"ARM encountered a fatal error processing {job.title}."
+                   f" Randomly generated path suffix hit a duplicate collision: {hb_out_path} ")
+            database_updater({'status': JobState.FAILURE.value, 'errors': 'Generating unique path failed'}, job)
+            sys.exit()
+    return hb_out_path
+
+
+def check_for_dupe_folder(hb_out_path, job):
     """
     Check if the folder already exists
      if it exists lets make a new one using random numbers
@@ -808,13 +890,12 @@ def check_for_dupe_folder(have_dupes, hb_out_path, job):
     :param job: Current job
     :return: Final media directory path
     """
-    if (make_dir(hb_out_path)) is False:
+    if os.path.exists(hb_out_path):
         logging.info(f"Output directory \"{hb_out_path}\" already exists.")
         # Only begin ripping if we are allowed to make duplicates
         # Or the successful rip of the disc is not found in our database
         logging.debug(f"Value of ALLOW_DUPLICATES: {cfg.arm_config['ALLOW_DUPLICATES']}")
-        logging.debug(f"Value of have_dupes: {have_dupes}")
-        if cfg.arm_config["ALLOW_DUPLICATES"] or not have_dupes:
+        if cfg.arm_config["ALLOW_DUPLICATES"]:
             hb_out_path = hb_out_path + "_" + job.stage
             make_dir(hb_out_path, False)
         else:
