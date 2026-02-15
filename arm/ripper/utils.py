@@ -881,7 +881,7 @@ def create_unique_dir(hb_out_path, job):
     return hb_out_path
 
 
-def check_for_dupe_folder(hb_out_path, job):
+def get_all_dupe_jobs(job) -> list[Job] | None:
     """
     Check if the folder already exists
      if it exists lets make a new one using random numbers
@@ -914,8 +914,8 @@ def get_all_dupe_jobs(job) -> list[dict[str,str]] | None:
     function for checking the database to look for jobs that
     have not failed with the same label.
     This means currently running jobs might be grabbed
-    :param job: The job obj, so we can use the crc/title etc.
-    :return: dict/None
+    :param job: The job obj, so we can use the label etc.
+    :return: List[Job]/None
     """
     logging.debug(f"Trying to find jobs with matching Label={job.label}")
     if job.label is None:
@@ -926,14 +926,8 @@ def get_all_dupe_jobs(job) -> list[dict[str,str]] | None:
         # but anything else thats currently in progress can be a Dupe
         matching_jobs = Job.query.filter(Job.label==job.label, Job.status != JobState.FAILURE.value, Job.job_id != job.job_id).all()
         results = []
-        i = 0
         for j in matching_jobs:
-            # logging.debug(f"job obj= {j.get_d()}")
-            job_dict = j
-            results[i] = {}
-            for key, value in iter(job_dict):
-                results[i][str(key)] = str(value)
-            i += 1
+            results.append(j)
         return results
 
 
