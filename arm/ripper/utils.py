@@ -883,34 +883,6 @@ def create_unique_dir(hb_out_path, job):
 
 def get_all_dupe_jobs(job) -> list[Job] | None:
     """
-    Check if the folder already exists
-     if it exists lets make a new one using random numbers
-    :param have_dupes: is this title in the local arm database
-    :param hb_out_path: path to HandBrake out
-    :param job: Current job
-    :return: Final media directory path
-    """
-    if os.path.exists(hb_out_path):
-        logging.info(f"Output directory \"{hb_out_path}\" already exists.")
-        # Only begin ripping if we are allowed to make duplicates
-        # Or the successful rip of the disc is not found in our database
-        logging.debug(f"Value of ALLOW_DUPLICATES: {cfg.arm_config['ALLOW_DUPLICATES']}")
-        if cfg.arm_config["ALLOW_DUPLICATES"]:
-            hb_out_path = hb_out_path + "_" + job.stage
-            make_dir(hb_out_path, False)
-        else:
-            # We aren't allowed to rip dupes, notify and exit
-            logging.info("Duplicate rips are disabled.")
-            notify(job, NOTIFY_TITLE, f"ARM Detected a duplicate disc. For {job.title}. "
-                                      f"Duplicate rips are disabled. "
-                                      f"You can re-enable them from your config file. ")
-            raise RipperException("Duplicate rips are disabled")
-    logging.info(f"Final Output directory \"{hb_out_path}\"")
-    return hb_out_path
-
-
-def get_all_dupe_jobs(job) -> list[dict[str,str]] | None:
-    """
     function for checking the database to look for jobs that
     have not failed with the same label.
     This means currently running jobs might be grabbed
