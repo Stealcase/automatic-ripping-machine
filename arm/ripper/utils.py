@@ -332,10 +332,10 @@ def move_files_main(old_file, new_file, base_path):
         logging.info(f"File: {new_file} already exists.  Not moving.")
 
 
-def move_movie_poster(final_directory, hb_out_path):
+def move_movie_poster(hb_out_path, final_directory):
     """move movie poster\n
     ---------\n
-    DEPRECIATED - Arm already builds the final path so moving is no longer needed"""
+    """
     src_poster = os.path.join(hb_out_path, "poster.png")
     dst_poster = os.path.join(final_directory, "poster.png")
     if os.path.isfile(src_poster):

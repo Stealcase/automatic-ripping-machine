@@ -106,19 +106,26 @@ def check_fstab():
 def main():
     """main disc processing function"""
     logging.info("Starting Disc identification")
+    if job == None:
+        raise utils.RipperException("Job is null or empty")
     identify.identify(job)
 
+
     # --- Duplicate Check -----
-    # Check db for any ongoing jobs that match the Label
+    # DVDs that are not correctly mounted or titles extracted, but can still be ripped, sometimes
+    # end up with a label called "DVDVolume". We do not want to stop these with a dupe check.
+    skip_dupe_check = job.label == "DVDVolume"
     # We want to exit as early as possible if the user does
     # not allow Dupes
-    dupes = utils.get_all_dupe_jobs(job)
-    if dupes != None and len(dupes) > 0:
-        logging.debug(f"{len(dupes)} dupes found")
-        for dupe in dupes:
-            logging.debug(f"{dupe}")
-        if utils.check_if_dupe_should_exit_early(job):
-            raise utils.RipperException(f"Job killed due to Duplicate check")
+    if skip_dupe_check == False: 
+        # Check db for any ongoing jobs that match the Label
+        dupes = utils.get_all_dupe_jobs(job)
+        if dupes != None and len(dupes) > 0:
+            logging.debug(f"{len(dupes)} dupes found")
+            for dupe in dupes:
+                logging.debug(f"{dupe}")
+            if utils.check_if_dupe_should_exit_early(job):
+                raise utils.RipperException(f"Job killed due to Duplicate check")
     utils.notify_entry(job)
 
     # Check if user has manual wait time enabled
@@ -130,7 +137,7 @@ def main():
     # Ripper type assessment for the various media types
     # Type: dvd/bluray
     if job.disctype in ["dvd", "bluray"]:
-        arm_ripper.rip_visual_media(job, logfile, job.has_track_99)
+        arm_ripper.rip_visual_media(job, log_file, job.has_track_99)
 
     # Type: Music
     elif job.disctype == "music":

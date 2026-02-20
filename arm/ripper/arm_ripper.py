@@ -26,10 +26,9 @@ def rip_visual_media(job, logfile, protection):
     :param protection: Does the disc have 99 track protection
     :return: None
     """
-    # Fix the sub-folder type - (movie|tv|unknown)
 
-    makemkv_out_path = None
-    transcode_in_path = str(job.devpath)
+    output_path = None
+    input_path = str(job.devpath)
     # Do we need to use MakeMKV - Blu-rays, protected dvd's, and dvd with mainfeature off
     use_make_mkv = rip_with_mkv(job, protection)
     logging.debug(f"Using MakeMKV: [{use_make_mkv}]")
@@ -39,38 +38,40 @@ def rip_visual_media(job, logfile, protection):
         job.status = JobState.VIDEO_RIPPING.value
         db.session.commit()
         try:
-            makemkv_out_path = makemkv.makemkv(job)
+            output_path = makemkv.makemkv(job)
         except Exception as mkv_error:  # noqa: E722
             raise utils.RipperException("Error while running MakeMKV") from mkv_error
 
         if job.config.NOTIFY_RIP:
             utils.notify(job, constants.NOTIFY_TITLE, f"{job.title} rip complete. Starting transcode. ")
         logging.info("************* Ripping with MakeMKV completed *************")
-        # point HB/FFMPEG to the path MakeMKV ripped to
-        transcode_in_path = makemkv_out_path
     
+    if output_path == None:
+        raise utils.RipperException("No output path for rip")
+
     # Save poster image from disc if enabled
-    utils.save_disc_poster(transcode_in_path, job)
+    utils.save_disc_poster(output_path, job)
     
+    # Fix the sub-folder type - (movie|tv|unknown)
     type_sub_folder = utils.convert_job_type(job.video_type)
     # Fix the job title - Title (Year) | Title
     job_title = utils.fix_job_title(job)
 
-    # We need to check/construct the final path, and the transcode path
-    transcode_out_path = os.path.join(job.config.TRANSCODE_PATH, type_sub_folder, job_title)
-    transcode_out_path = utils.create_unique_dir(transcode_out_path, job)
-    logging.info(f"Processing files to: {transcode_out_path}")
-    # Begin transcoding section - only transcode if skip_transcode is false
-    start_transcode(job, logfile, transcode_in_path, transcode_out_path, protection)
-
     # --------------- POST PROCESSING ---------------
     # If ripped with MakeMKV remove the 'out' folder and set the raw as the output
     logging.debug(f"Transcode status: [{job.config.SKIP_TRANSCODE}] and MakeMKV Status: [{use_make_mkv}]")
-    if job.config.SKIP_TRANSCODE and use_make_mkv:
-        utils.delete_raw_files([transcode_out_path])
-        transcode_out_path = transcode_in_path
-
-
+    if job.config.SKIP_TRANSCODE:
+        input_path = output_path
+        logging.info("Skipping transcode")
+    else:
+        #The input for this step is the output of the last step
+        input_path = output_path
+        # We need to construct the transcode path
+        output_path = os.path.join(job.config.TRANSCODE_PATH, type_sub_folder, job_title)
+        output_path = utils.create_unique_dir(output_path, job)
+        logging.info(f"Processing files to: {output_path}")
+        # Begin transcoding section - only transcode if skip_transcode is false
+        start_transcode(job, logfile, input_path, output_path, protection)
 
     # Check folders for already ripped jobs -> creates folder
     final_directory = os.path.join(job.config.COMPLETED_PATH, type_sub_folder, job_title)
@@ -79,24 +80,17 @@ def rip_visual_media(job, logfile, protection):
     utils.database_updater({'path': final_directory}, job)
     # Update final path if user has set a custom/manual title
     logging.debug(f"Job title status: [{job.title_manual}]")
-    if job.title_manual:
-        # Remove the old final dir
-        utils.delete_raw_files([final_directory])
-        job_title = utils.fix_job_title(job)
-        final_directory = os.path.join(job.config.COMPLETED_PATH, type_sub_folder, job_title)
-        # Update the job.path with the final directory
-        utils.database_updater({'path': final_directory}, job)
 
     # Move to final folder
-    move_files_post(transcode_out_path, job)
+    move_files_post(input_path, job)
     # Movie the movie poster if we have one - no longer needed, now handled by save_movie_poster
-    utils.move_movie_poster(final_directory, transcode_out_path)
+    utils.move_movie_poster(input_path, final_directory)
     # Scan Emby if arm.yaml requires it
     utils.scan_emby()
     # Set permissions if arm.yaml requires it
     utils.set_permissions(final_directory)
     # If set in the arm.yaml remove the raw files
-    utils.delete_raw_files([transcode_in_path, transcode_out_path, makemkv_out_path])
+    utils.delete_raw_files([input_path, output_path])
     # report errors if any
     notify_exit(job)
     logging.info("************* ARM processing complete *************")
