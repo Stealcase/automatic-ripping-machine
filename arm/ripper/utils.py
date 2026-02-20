@@ -31,7 +31,6 @@ from arm.ripper import apprise_bulk
 
 NOTIFY_TITLE = "ARM notification"
 
-
 class RipperException(Exception):
     pass
 
